@@ -1,0 +1,10 @@
+import runtime;
+import ds/array;
+import string;
+
+main() {
+    arr : [int] = [1,2,3];
+    newArr = map(arr, \i -> i2s(i));
+    println(strGlue(newArr, ", "));
+    quit(0);
+}

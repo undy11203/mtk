@@ -1,0 +1,58 @@
+import lingo/pegcode/driver;
+import string;
+
+Exp ::= Sum, Mul, Const;
+Sum : (l : Exp, r : Exp);
+Mul :  (l : Exp, r : Exp);
+Const : (i : int);
+
+config = compilePegGrammar("#include lab5_arithmetic.lingo");
+
+exp2s(exp: Exp) -> string {
+    switch(exp) {
+        Sum(l, r): exp2s(l) + "+" + exp2s(r);
+        Mul(l, r): if(l.structname == "Sum" && r.structname == "Sum") 
+                    {"(" + exp2s(l) + ")" + "*" + "(" + exp2s(r) + ")"}
+                   else if(r.structname == "Sum")
+                    {exp2s(l) + "*" + "(" + exp2s(r) + ")"}
+                   else if(l.structname == "Sum")
+                     {"(" + exp2s(l) + ")" + "*" + exp2s(r)} 
+                   else
+                    {exp2s(l) + "*" + exp2s(r)};
+        Const(i): i2s(i);
+    }
+}
+
+exp2i(exp: Exp) -> int {
+    switch (exp) {
+        Sum(l, r):  exp2i(l) + exp2i(r);
+        Mul(l, r):  exp2i(l) * exp2i(r);
+        Const(i): i;
+    }
+}
+
+s2lingo(str: string) {
+    parsic(config, str, defaultPegActions);
+}
+
+main() {
+    tests: [Pair<string, int>] = [
+        Pair("3 * 12 * ( 7 + 4 ) + 6", 402),
+        Pair("3+(12+7)*2", 41),
+        Pair("(3+12+7)*2", 44),
+        Pair("3+7", 10),
+        Pair("1+2+3", 6),
+        Pair("(1+2)*(2+4)", 18),
+        Pair("(2*3)+(4*2)", 14)
+    ];
+    
+    fori(0, length(tests) - 1, \i -> {
+        str: string = tests[i].first;
+        expr = s2lingo(str);
+        println(expr);
+        println(exp2s(expr));
+        println(exp2i(expr));
+        println(exp2i(expr) == tests[i].second);
+    });
+    quit(0);
+}

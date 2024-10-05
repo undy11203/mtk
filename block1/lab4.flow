@@ -1,0 +1,36 @@
+import runtime;
+import ds/array;
+import ds/tuples;
+import ds/tree;
+
+indsOn2(a : [int], m : int) -> [Pair<int, int>] {
+    foldi(a, [], \i, t, value1 
+        -> concat(t, foldi(a, [], \j, k, value2 
+            -> if(value1 + value2 == m){
+                concat(k, [Pair(i, j)]);
+                }else {
+                    k;
+                }))
+        );
+}
+
+indsOnlogn(a : [int], m : int) -> [Pair<int, int>] {
+    tree = foldi(a, makeTree(), \i, t, v ->
+                //setTree(t, v, arrayPush(getTreeArrayValue(t, v), i)));
+    treePushToArrayValue(t, v, i));
+    // foldi(a, [], \i, arr, v ->
+    //             switch(lookupTree(tree, m-v)){
+    //                 Some(nodeArr): concat(arr, map(nodeArr, \j -> Pair(i, j)));
+    //                 None() : arr;
+    //             });
+
+    foldi(a, [], \i, pairs, v -> 
+            concat(pairs, map(getTreeArrayValue(tree, m-v), \j -> Pair(i, j)))
+        );
+}
+
+main() {
+    println(indsOn2([1, 2, 3, 3, 4, 5, 6, 7, 8], 6));
+    println(indsOnlogn([1, 2, 3, 3, 4, 5, 6, 7, 8], 6));
+    quit(0);
+}

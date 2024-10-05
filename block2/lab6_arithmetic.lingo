@@ -1,0 +1,16 @@
+// expr = number | "+" expr expr | "*" expr expr;
+
+// exprt = (number:n | "+" {} | "*")+;
+// number = digit+$d {Const(s2i($d))} | "(" expr:e ")" {:e};
+
+// digit = '0'-'9';
+
+expr = ws sum:e ws {:e};
+
+sum = mul:l ws "+" ws sum:r {Sum(:l, :r)} | mul:e {:e};
+mul = const:l ws "*" ws mul:r {Mul(:l, :r)} | const:e {:e};
+
+const = digit+$d {Const(s2i($d))} | "(" expr:e ")" {:e};
+
+digit = '0'-'9';
+ws = " "*;
