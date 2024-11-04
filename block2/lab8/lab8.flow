@@ -1,0 +1,258 @@
+import string;
+import lingo/pegcode/driver;
+import math/math;
+
+Exp ::= Add, Sub, Mul, Div, Int, Var, Neg;
+Add : (e1 : Exp, e2 : Exp);
+Sub : (e1: Exp, e2 : Exp);
+Mul : (e1 : Exp, e2 : Exp);
+Div : (e1: Exp, e2: Exp);
+Int : (i : double);
+Var : (name: string);
+Neg : (e: Exp);
+
+config = compilePegGrammar("#include lab8.lingo");
+specialPegActions = {
+    t1 = setTree(defaultPegActions.t, "buildSub", buildSub);
+    t2 = setTree(t1, "buildDiv", buildDiv);
+    SemanticActions(t2);
+}
+
+s2lingo(str: string) {
+    parsic(config, str, specialPegActions);
+}
+
+buildSub(xs : [flow]) {
+	fold(xs[1], xs[0], \acc, x -> Sub(acc, x))
+}
+
+buildDiv(xs : [flow]) {
+	fold(xs[1], xs[0], \acc, x -> Div(acc, x))
+}
+
+//PRINT
+//------------->
+
+brackets0(e: Exp) -> string{
+    if(e.structname == "Var" || e.structname == "Int"){
+        exp2s(e);
+    }else{
+        "(" + exp2s(e) + ")";
+    }
+}
+
+brackets1(l: Exp, r: Exp, op: string) {
+    ls = exp2s(l);
+    rs = if(r.structname != "Var" && r.structname != "Int" && r.structname != "Neg")
+            "(" + exp2s(r) + ")"
+        else exp2s(r);
+    ls + op + rs;
+}
+
+brackets2(l: Exp, r: Exp, op: string) {
+    ls = if(l.structname == "Add" || l.structname == "Sub")
+            "(" + exp2s(l) + ")"
+        else exp2s(l);
+    rs = if(r.structname == "Add" || r.structname == "Sub")
+            "(" + exp2s(r) + ")"
+        else exp2s(r);
+    ls + op + rs;
+}
+
+exp2s(exp: Exp) -> string {
+    switch(exp) {
+        Add(l, r): exp2s(l) + "+" + exp2s(r);
+        Sub(l, r): brackets1(l, r, "-");
+        Mul(l, r): brackets2(l, r, "*");
+        Div(l, r): brackets2(l, r, "/");
+        Int(i): d2s(i);
+        Var(e): e;
+        Neg(e): "-" + brackets0(e);
+    }
+}
+
+//!!!!!!!!!!!!!
+// !PRINT
+
+// DERATIVE
+//------------->
+
+exp2diff(exp: Exp, var: string) -> Exp {
+    switch (exp) {
+        Mul(left, rigth) : Add(
+                                Mul(exp2diff(left, var), rigth), 
+                                Mul(left, exp2diff(rigth, var))
+                              );
+		Div(left, rigth) : Div(
+                                Sub(Mul(exp2diff(left, var), rigth), Mul(left, exp2diff(rigth, var))), 
+                                Mul(rigth, rigth)
+                              );
+        Add(left, rigth) : Add(exp2diff(left, var), exp2diff(rigth, var));
+        Sub(left, rigth) : Sub(exp2diff(left, var), exp2diff(rigth, var));
+		Neg(val): Neg(exp2diff(val, var));
+        Int(val) : Int(0.0);
+        Var(val) : if (val == var) Int(1.0) else Int(0.0);		
+    }
+}
+
+//!!!!!!!!!!!!!
+// !DERATIVE
+
+// SIMPLIFY
+//------------->
+
+isInt(exp: Exp) -> Maybe<Int> {
+    switch(exp) {
+        Int(v): Some(Int(v));
+        Var(x): None();
+        Add(a,b): None();
+        Sub(a,b): None();
+        Mul(a,b): None();
+        Div(a,b): None();
+        Neg(v): None();
+    }
+}
+
+isNeg(exp: Exp) -> Maybe<Exp> {
+    switch(exp) {
+        Int(v): None();
+        Var(x): None();
+        Add(a,b): None();
+        Sub(a,b): None();
+        Mul(a,b): None();
+        Div(a,b): None();
+        Neg(v): Some(v);
+    }
+}
+
+isZero(v: Int) {
+    v == Int(0.0)
+}
+
+simplifyAdd(l: Exp, r: Exp) {
+    v1 = Pair(eitherMap(isInt(l), isZero, false), r);
+    v2 = Pair(eitherMap(isInt(r), isZero, false), l);
+    if (v1.first && v2.first) {
+        Int(0.0)
+    } else {
+        if (v1.first) {
+            v1.second
+        } else {
+            if (v2.first) {
+                v2.second
+            } else {
+                Add(l, r)
+            }
+        }
+    } 
+}
+
+simplifySub(l: Exp, r: Exp) {
+    v1 = Pair(eitherMap(isInt(l), isZero, false), r);
+    v2 = Pair(eitherMap(isInt(r), isZero, false), l);
+    if (v1.first && v2.first) {
+        Int(0.0)
+    } else {
+        if (v1.first) {
+            Neg(v1.second)
+        } else {
+            if (v2.first) {
+                v2.second
+            } else {
+                Sub(l, r)
+            }
+        }
+    }
+}
+
+simplifyMul(l: Exp, r: Exp) {
+    v1 = eitherMap(isInt(l), isZero, false);
+    v2 = eitherMap(isInt(r), isZero, false);
+    if (v1 || v2) {
+        Int(0.0)
+    } else {
+        vv1 = Pair(eitherMap(isInt(l), \v->v==Int(1.0), false), r);
+        vv2 = Pair(eitherMap(isInt(r), \v->v==Int(1.0), false), l);
+        if (vv1.first && vv2.first) {
+            Int(1.0)
+        } else {
+            if (vv1.first) {
+                vv1.second
+            } else if (vv2.first) {
+                vv2.second
+            } else {
+                Mul(l, r)
+            }
+            
+        }                 
+    }
+}
+
+simplifyDiv(l: Exp, r: Exp) {
+    v1 = eitherMap(isInt(l), isZero, false);
+    v2 = eitherMap(isInt(r), isZero, false);
+    if (v1 && !v2) {
+        Int(0.0)
+    } else {
+        vv2 = Pair(eitherMap(isInt(r), \v->v==Int(1.0), false), l);
+        if (vv2.first) {
+            vv2.second
+        } else {
+            if (l == r) {
+                Int(1.0)
+            } else {
+                Div(l,r)
+            }
+        }                 
+    }     
+}
+
+simplifyNeg(v: Exp) {
+    v1 = Pair(eitherMap(isInt(v), isZero, false), v);
+    if (v1.first) {
+        Int(0.0)
+    } else {
+        eitherMap(isNeg(v), idfn, Neg(v))
+    }
+}
+
+
+simplify(exp: Exp) -> Exp{
+    switch(exp) {
+        Int(val): Int(val);
+        Var(var): Var(var);
+        Add(l,r): simplifyAdd(simplify(l),simplify(r));
+        Sub(l,r): simplifySub(simplify(l),simplify(r));
+        Mul(l,r): simplifyMul(simplify(l),simplify(r));
+        Div(l,r): simplifyDiv(simplify(l),simplify(r));
+        Neg(v): simplifyNeg(simplify(v));
+    }    
+}
+
+//!!!!!!!!!!!!!
+// !SIMPLIFY
+
+main() {
+    tests: [Pair<string, double>] = [
+        Pair("2 * (x + y) + (3 * x - 2 * y) + (4 * y - x) + (x * 0) + (y * 0)", 0.0),
+        Pair("-x * x + 5 *  x", 0.0),
+        Pair("x - x", 0.0),
+        Pair("y-x", 0.0),
+        Pair("x*0", 0.0),
+        Pair("0*x", 0.0),
+        Pair("30*x + 0/x", 0.0),
+        Pair("1", 0.0)
+    ];
+
+    
+    fori(0, length(tests) - 1, \i -> {
+        str: string = tests[i].first;
+        expr = s2lingo(str);
+        println(expr);
+        println(exp2diff(expr, "x"));
+        println(exp2s(exp2diff(expr, "x")));
+        println(exp2s(simplify(exp2diff(expr, "x"))));
+        println("\n");
+    });
+    quit(0);
+}

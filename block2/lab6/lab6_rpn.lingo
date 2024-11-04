@@ -1,0 +1,10 @@
+expr = (sum | mul | number)+:t {:t};
+
+// factor = number:t {:t} | sum:t {:t} | mul:t {:t};
+mul = ws "*":t ws {MulToken()};
+sum = ws "+":t ws {SumToken()};
+
+number = ws digit+$d ws {IntToken(s2i($d))};
+
+digit = '0'-'9';
+ws = " "*;

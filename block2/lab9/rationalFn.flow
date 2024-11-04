@@ -1,0 +1,246 @@
+import ast;
+
+export {
+PTerm : (t: [Pair<string, int>]);
+Polynomial : (e : Tree<PTerm, double>);
+FranctionPoly : (p1 : Polynomial, p2 : Polynomial);
+
+exp2rp(e: Exp) -> FranctionPoly;
+fp2s(rp: FranctionPoly) -> string;
+
+}
+
+// POLINOM
+//------------->
+
+
+treeMergeFn(t1: Tree<?, ??>, t2: Tree<?, ??>, fn: (??, ??) -> ??) -> Tree<?,??> {
+    mergeTreeCustom(t1,t2,\k,v1,v2-> fn(v1,v2))
+}
+
+buildPolynomialFn(p1: Polynomial, p2: Polynomial, fn: (double, double) -> double) {
+    Polynomial(treeMergeFn(p1.e, p2.e, fn))
+}
+
+buildNegPoly(t: Polynomial) {
+    Polynomial(
+        mapTree(
+            t.e,
+            \v -> -v
+        )
+    )
+}
+
+mulTerm(t1: PTerm, t2: PTerm) {
+    mapped = map(t1.t, \e->e.first);
+    PTerm(sort(concat(
+        fold(t1.t,[], \acc,e-> {
+            arrayPush(acc,fold(t2.t, e ,\acci,ei-> {
+                if (e.first == ei.first) {
+                    Pair(acci.first, acci.second + ei.second)
+                } else {
+                    acci
+                }
+            }))
+        }),
+        fold(t2.t,[], \acc, e-> {
+        if (contains(mapped, e.first)) {
+            acc
+        } else {
+            arrayPush(acc, e)
+        }  
+        })
+    )))
+}
+
+addPolynomial(p1: Polynomial, p2: Polynomial) {
+    buildPolynomialFn(p1, p2,\a, b -> a + b)
+}
+
+mulPolynomial(p1: Polynomial, p2: Polynomial) {
+    Polynomial(
+        foldTree(
+            p1.e,
+            makeTree(),
+            \k,v,acc -> {
+                mergeTreeCustom(
+                    acc,
+                    foldTree(
+                        p2.e,
+                        makeTree(),
+                        \ki, vi, acci -> {
+                            setTree(acci, mulTerm(k, ki), v * vi)
+                        }
+                    ),
+                    \kj, v1, v2 -> v1 + v2
+                )
+            }
+        )
+    )
+}
+
+removeZeroTerms(p: FranctionPoly) {
+    l = Polynomial(filterTree(p.p1.e,\k,v->v!=0.0));
+    r = Polynomial(filterTree(p.p2.e,\k,v->v!=0.0));
+    if(isEmptyTree(l.e)) FranctionPoly(buildConstantPoly(0.0), r) else FranctionPoly(l, r);
+}
+
+buildConstantTerm() {
+    PTerm([])
+}
+
+buildTerm1(k: string, v: int) {
+    PTerm([Pair(k, v)])
+}
+
+buildPoly1(t: PTerm, v: double) {
+    Polynomial(makeTree1(t, v))
+}
+
+buildConstantPoly(v: double) {
+    buildPoly1(buildConstantTerm(), v)
+}
+
+exp2rp(e: Exp) -> FranctionPoly {
+    removeZeroTerms(switch(e) {
+        Int(v): {
+            FranctionPoly(
+                buildConstantPoly(v),
+                buildConstantPoly(1.0)
+            )
+        }
+        Var(x): {
+            FranctionPoly(
+                buildPoly1(buildTerm1(x, 1), 1.0),
+                buildConstantPoly(1.0)
+            )
+        }
+        Neg(v): {
+            r = exp2rp(v);
+            FranctionPoly(
+                buildNegPoly(r.p1),
+                r.p2
+            )         
+        }
+        Add(v1,v2): {
+            l = exp2rp(v1);
+            r = exp2rp(v2);
+            FranctionPoly(
+                addPolynomial(
+                    mulPolynomial(l.p1, r.p2),
+                    mulPolynomial(r.p1, l.p2)
+                ),
+                mulPolynomial(l.p2, r.p2)
+            )
+        }
+        Sub(v1,v2): {
+            l = exp2rp(v1);
+            rr = exp2rp(v2);
+            r = FranctionPoly(buildNegPoly(rr.p1),rr.p2);
+
+            FranctionPoly(
+                addPolynomial(
+                    mulPolynomial(l.p1, r.p2),
+                    mulPolynomial(r.p1, l.p2)
+                ),
+                mulPolynomial(l.p2, r.p2)
+            )
+        }
+        Mul(v1,v2): {
+            l = exp2rp(v1);
+            r = exp2rp(v2);
+            FranctionPoly(
+                mulPolynomial(l.p1,r.p1),
+                mulPolynomial(l.p2,r.p2)
+            )
+        }
+        Div(v1,v2): {
+            l = exp2rp(v1);
+            r = exp2rp(v2);
+            FranctionPoly(
+                mulPolynomial(l.p1,r.p2),
+                mulPolynomial(l.p2,r.p1)
+            )           
+        }
+    })
+}
+
+//!!!!!!!!!!!!!
+// !POLINOM
+
+// POLINOM_PRINT
+//------------->
+
+t2s(t: PTerm) {
+    fold(
+        t.t,
+        "",
+        \acc, e -> {
+            acc + e.first + "^" + i2s(e.second)
+	        // rpad(acc, e.first, e.second);
+        }
+    )
+}
+
+p2s(p: Polynomial) {
+    rtrim2(foldTree(
+        p.e,
+        "",
+        \k,v,acc -> {
+            acc + d2s(v) + t2s(k) + " + "
+        }
+    ), "+ ")
+}
+
+fp2s(rp: FranctionPoly) {
+    num = p2s(rp.p1);
+    denom = p2s(rp.p2);
+    mx = max(strlen(num), strlen(denom));
+    mn = min(strlen(num), strlen(denom));
+    divstr = strRepeat("-", mx);
+    "\n" + num + "\n" + divstr + "\n" + strRepeat(" ", (mx - mn)/2) + denom
+}
+
+poly2exp(poly: Polynomial) -> Exp {
+    m : Exp = Int(0.0);
+    foldTree(poly.e, m, \k, v, acc -> {
+        vals = fold(k.t, "", \exp, d -> {
+            g = "";
+            exp + rpad(g, d.first + "*", d.second);
+        });
+        newvals = rtrim2(vals, "*");
+        if(newvals == ""){
+            if(acc == m){
+                e:Exp = Int(v);
+                e;
+            }else{
+                e:Exp = Add(acc, Int(v));
+                e;
+            }
+        }else {
+            if(acc == m){
+                newexp = s2lingo(newvals);
+                e: Exp = Mul(Int(v), newexp);
+                e;
+            }else{
+                newexp = s2lingo(newvals);
+                e: Exp = Add(acc, Mul(Int(v), newexp));
+                e;
+            }
+        }
+    });
+}
+
+fp2exp(rp: FranctionPoly) -> Exp {
+    num = rp.p1;
+    denom = rp.p2;
+
+    numExp = poly2exp(num);
+    denomExp = poly2exp(denom);
+    println(numExp);
+    println(denomExp);
+    Div(numExp, denomExp);
+}
+
+//!!!!!!!!!!!!!
+// !POLINOM_PRINT

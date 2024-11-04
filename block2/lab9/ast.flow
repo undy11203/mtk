@@ -1,0 +1,82 @@
+import string;
+import lingo/pegcode/driver;
+import math/math;
+
+export {
+Exp ::= Add, Sub, Mul, Div, Int, Var, Neg;
+Add : (e1 : Exp, e2 : Exp);
+Sub : (e1: Exp, e2 : Exp);
+Mul : (e1 : Exp, e2 : Exp);
+Div : (e1: Exp, e2: Exp);
+Int : (i : double);
+Var : (name: string);
+Neg : (e: Exp);
+
+
+exp2s(exp: Exp) -> string;
+s2lingo(str: string) -> Exp;
+
+}
+
+config = compilePegGrammar("#include lab9.lingo");
+specialPegActions = {
+    t1 = setTree(defaultPegActions.t, "buildSub", buildSub);
+    t2 = setTree(t1, "buildDiv", buildDiv);
+    SemanticActions(t2);
+}
+
+s2lingo(str: string) {
+    parsic(config, str, specialPegActions);
+}
+
+buildSub(xs : [flow]) {
+	fold(xs[1], xs[0], \acc, x -> Sub(acc, x))
+}
+
+buildDiv(xs : [flow]) {
+	fold(xs[1], xs[0], \acc, x -> Div(acc, x))
+}
+
+//PRINT
+//------------->
+
+brackets0(e: Exp) -> string {
+    if(e.structname == "Var" || e.structname == "Int"){
+        exp2s(e);
+    }else{
+        "(" + exp2s(e) + ")";
+    }
+}
+
+brackets1(l: Exp, r: Exp, op: string) {
+    ls = exp2s(l);
+    rs = if(r.structname != "Var" && r.structname != "Int" && r.structname != "Neg")
+            "(" + exp2s(r) + ")"
+        else exp2s(r);
+    ls + op + rs;
+}
+
+brackets2(l: Exp, r: Exp, op: string) {
+    ls = if(l.structname == "Add" || l.structname == "Sub")
+            "(" + exp2s(l) + ")"
+        else exp2s(l);
+    rs = if(r.structname == "Add" || r.structname == "Sub")
+            "(" + exp2s(r) + ")"
+        else exp2s(r);
+    ls + op + rs;
+}
+
+exp2s(exp: Exp) -> string {
+    switch(exp) {
+        Add(l, r): exp2s(l) + "+" + exp2s(r);
+        Sub(l, r): brackets1(l, r, "-");
+        Mul(l, r): brackets2(l, r, "*");
+        Div(l, r): brackets2(l, r, "/");
+        Int(i): d2s(i);
+        Var(e): e;
+        Neg(e): "-" + brackets0(e);
+    }
+}
+
+//!!!!!!!!!!!!!
+// !PRINT

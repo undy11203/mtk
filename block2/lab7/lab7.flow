@@ -1,0 +1,138 @@
+import string;
+import lingo/pegcode/driver;
+import math/math;
+
+Exp ::= Add, Sub, Mul, Div, Int, Var, Neg;
+Add : (e1 : Exp, e2 : Exp);
+Sub : (e1: Exp, e2 : Exp);
+Mul : (e1 : Exp, e2 : Exp);
+Div : (e1: Exp, e2: Exp);
+Int : (i : double);
+Var : (name: string);
+Neg : (e: Exp);
+
+config = compilePegGrammar("#include lab7.lingo");
+specialPegActions = {
+    t1 = setTree(defaultPegActions.t, "buildSub", buildSub);
+    t2 = setTree(t1, "buildDiv", buildDiv);
+    SemanticActions(t2);
+}
+
+s2lingo(str: string) {
+    parsic(config, str, specialPegActions);
+}
+
+buildSub(xs : [flow]) {
+	fold(xs[1], xs[0], \acc, x -> Sub(acc, x))
+}
+
+buildDiv(xs : [flow]) {
+	fold(xs[1], xs[0], \acc, x -> Div(acc, x))
+}
+
+// exp2d(expr: Exp, vars: Tree<string, double>) {
+//     switch (expr) {
+        // Add(l, r): exp2d(l, vars) + exp2d(r, vars);
+        // Sub(l, r): exp2d(l, vars) - exp2d(r, vars);
+        // Mul(l, r): exp2d(l, vars) * exp2d(r, vars);
+        // Div(l, r): exp2d(l, vars) / exp2d(r, vars);
+        // Int(i): i;
+        // Var(name): either(lookupTree(vars, name), 0.0);
+        // Neg(e): 0.0 - exp2d(e, vars);
+//     }
+// }
+
+//maybemap2
+exp2d(expr: Exp, vars: Tree<string, double>) -> Maybe<double> {
+    switch (expr) {
+        Add(l, r): maybeMap2(\lv, rv -> {lv + rv})(exp2d(l, vars), exp2d(r, vars));
+        Sub(l, r): maybeMap2(\lv, rv -> {lv - rv})(exp2d(l, vars), exp2d(r, vars));
+        Mul(l, r): maybeMap2(\lv, rv -> {lv * rv})(exp2d(l, vars), exp2d(r, vars));
+        Div(l, r): 
+            maybeBind2(\lv, rv -> {
+                if(rv == 0.0){
+                    None();
+                }else {
+                    Some(lv / rv);
+                }
+            })(exp2d(l, vars), exp2d(r, vars));
+        Int(i): Some(i);
+        Var(name): lookupTree(vars, name);
+        Neg(e): maybeMap(exp2d(e, vars), \var -> {0.0 - var});
+    }
+}
+
+brackets0(e: Exp) -> string{
+    if(e.structname == "Var" || e.structname == "Int"){
+        exp2s(e);
+    }else{
+        "(" + exp2s(e) + ")";
+    }
+}
+
+brackets1(l: Exp, r: Exp, op: string) {
+    ls = exp2s(l);
+    rs = if(r.structname != "Var" && r.structname != "Int" && r.structname != "Neg")
+            "(" + exp2s(r) + ")"
+        else exp2s(r);
+    ls + op + rs;
+}
+
+brackets2(l: Exp, r: Exp, op: string) {
+    ls = if(l.structname == "Add" || l.structname == "Sub")
+            "(" + exp2s(l) + ")"
+        else exp2s(l);
+    rs = if(r.structname == "Add" || r.structname == "Sub")
+            "(" + exp2s(r) + ")"
+        else exp2s(r);
+    ls + op + rs;
+}
+
+exp2s(exp: Exp) -> string {
+    switch(exp) {
+        Add(l, r): exp2s(l) + "+" + exp2s(r);
+        Sub(l, r): brackets1(l, r, "-");
+        Mul(l, r): brackets2(l, r, "*");
+        Div(l, r): brackets2(l, r, "/");
+        Int(i): d2s(i);
+        Var(e): e;
+        Neg(e): "-" + brackets0(e);
+    }
+}
+
+main() {
+    tests: [Pair<string, double>] = [
+        Pair("1 + -b", -9.9),
+        Pair("1.2 + b", 12.1),
+        Pair("(a - (2.3 + q))/a", -28.2),
+        Pair("(a - -(2.3 + q))/a", 30.2),
+        Pair("0/1", 0.0),
+        Pair("1/0", 0.0)
+    ];
+    t: Tree<string, double> = setTreeValues(makeTree(), [
+        Pair("a", 3.5),
+        Pair("b", -3.4),
+        Pair("c", 10.3),
+        Pair("x", 12.0),
+        Pair("y", 8.7),
+        Pair("q", 99.9),
+        Pair("z", 42.0),
+        Pair("x1", 72.5),
+        Pair("x2", -10.3),
+    ]);
+
+    
+    fori(0, length(tests) - 1, \i -> {
+        str: string = tests[i].first;
+        expr = s2lingo(str);
+        println(expr);
+        res = exp2d(expr, t);
+        println(exp2s(expr));
+        res ?? println(res) : println("Division by zero");
+        println("\n");
+
+        // println(exp2d(expr, t) == tests[i].second);
+
+    });
+    quit(0);
+}

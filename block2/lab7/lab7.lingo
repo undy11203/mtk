@@ -1,0 +1,23 @@
+exp = ws additive:e ws {:e};
+
+additive = multiplicative:e1 subtraction*:e2 ws '+' ws additive:e3 {Add(buildSub(:e1, :e2),:e3)} |
+                 multiplicative:e1 subtraction*:e2 {buildSub(:e1, :e2)};
+multiplicative = term:e1 divisor*:e2 ws '*' ws multiplicative:e3 {Mul(buildDiv(:e1, :e2),:e3)} | 
+                term:e1 divisor*:e2 {buildDiv(:e1, :e2)};
+
+divisor = ws '/' ws term:e {:e};
+subtraction = ws '-' ws multiplicative:e {:e};
+
+term = int:e {:e} |
+       '-' int:e {Neg(:e)} |
+       var:e {:e} |
+       '-' var:e {Neg(:e)} |
+       '(' exp:e ')' {:e} |
+       '-(' exp:e ')' {Neg(:e)};
+
+int = (digit+ ('.' digit+)?)$d {Int(s2d($d))}; //fix(?)
+var = (letter (letter | digit)*)$n {Var(:n)};
+
+letter = 'a' - 'z' | 'A' - 'Z';
+digit = '0'-'9';
+ws = " "*;

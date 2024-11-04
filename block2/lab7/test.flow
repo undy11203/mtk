@@ -1,0 +1,9 @@
+import string;
+import lingo/pegcode/driver;
+import math/math;
+
+
+main() {
+    a = Some(None());
+    println(either(a, 0.0));
+}

@@ -1,0 +1,148 @@
+import string;
+import lingo/pegcode/driver;
+
+arithmGrammar = compilePegGrammar("#include lab6_arithmetic.lingo");
+rpnGrammar = compilePegGrammar("#include lab6_rpn.lingo");
+
+Exp ::= Sum, Mul, Int;
+Sum : (l : Exp, r : Exp);
+Mul : (l : Exp, r : Exp);
+Int : (i : int);
+
+arith2lingo(str: string) -> Exp {
+    parsic(arithmGrammar, str, defaultPegActions);
+}
+
+expArith2s(exp: Exp) -> string {
+    switch(exp) {
+        Sum(l, r): expArith2s(l) + "+" + expArith2s(r);
+        Mul(l, r): if(l.structname == "Sum" && r.structname == "Sum") 
+                    {"(" + expArith2s(l) + ")" + "*" + "(" + expArith2s(r) + ")"}
+                   else if(r.structname == "Sum")
+                    {expArith2s(l) + "*" + "(" + expArith2s(r) + ")"}
+                   else if(l.structname == "Sum")
+                     {"(" + expArith2s(l) + ")" + "*" + expArith2s(r)} 
+                   else
+                    {expArith2s(l) + "*" + expArith2s(r)};
+        Int(i): i2s(i);
+    }
+}
+
+expArith2i(exp: Exp) -> int {
+    switch (exp) {
+        Sum(l, r):  expArith2i(l) + expArith2i(r);
+        Mul(l, r):  expArith2i(l) * expArith2i(r);
+        Int(i): i;
+    }
+}
+
+RPNToken ::= IntToken, SumToken, MulToken;
+IntToken : (i : int);
+SumToken : ();
+MulToken : ();
+
+rpn2lingo(str: string) -> [RPNToken] {
+    parsic(rpnGrammar, str, defaultPegActions);
+}
+
+expRpn2i(expr) -> int {
+    lst = fold(expr, makeList(), \acc, f -> {
+        switch(f) {
+            MulToken() : 
+            {
+                l = headList(acc, 0);
+                acc2 = tailList(acc);
+                r = headList(acc2, 0);
+                acc3 = tailList(acc2);
+                Cons(l * r, acc3);
+            }
+            SumToken() : 
+            {
+                l = headList(acc, 0);
+                acc2 = tailList(acc);
+                r = headList(acc2, 0);
+                acc3 = tailList(acc2);
+                Cons(l + r, acc3);
+            }
+            IntToken(a) : 
+            {
+                Cons(a, acc);
+            }
+        }
+    });
+    
+    headList(lst, 0);
+}
+
+expRpn2s(ex: [RPNToken]) -> string {
+    fold(ex, "", \acc, r -> {
+        switch(r) {
+            SumToken() : acc + "+ ";
+            MulToken() : acc + "* ";
+            IntToken(a) : acc + i2s(a) + " ";
+        }
+    });
+}
+
+expRpn2arith(ex: [RPNToken]) -> Exp {
+    lst : List<Exp> = fold(ex, makeList(), \acc, f -> {
+        switch(f) {
+            MulToken() : 
+            { 
+                l = headList(acc, Int(0));
+                acc2 = tailList(acc);
+                r = headList(acc2, Int(0));
+                acc3 = tailList(acc2);
+                Cons(Mul(l, r), acc3);
+            }
+            SumToken() : 
+            {
+                l = headList(acc, Int(0));
+                acc2 = tailList(acc);
+                r = headList(acc2, Int(0));
+                acc3 = tailList(acc2);
+                Cons(Sum(l, r), acc3);
+            }
+            IntToken(a) : 
+            {
+                Cons(Int(a), acc);
+            }
+        }
+    });
+    
+    headList(lst, Int(0));
+}
+
+exprArith2rpn(ex: Exp) -> [RPNToken] {
+    switch (ex) {
+		Mul(a, b) : concat(concat(exprArith2rpn(a), exprArith2rpn(b)), [MulToken()]);
+		Sum(a, b) : concat(concat(exprArith2rpn(a), exprArith2rpn(b)), [SumToken()]);
+        Int(a)    : [IntToken(a)];
+	}
+}
+
+
+
+main() {
+    tests: [Pair<string, int>] = [
+        Pair(" 7 2 * ", 14),
+        Pair(" 7 2 3 * +", 13),
+        Pair(" 7 2 3 + *", 35),
+        Pair("7 2 * 3 +", 17)
+    ];
+    
+    fori(0, length(tests) - 1, \i -> {
+        str: string = tests[i].first;
+        expr = rpn2lingo(str);
+        b = expRpn2i(expr);
+        println(expr);
+        println(b);
+        println(b == tests[i].second);
+        println(expRpn2arith(expr));
+        arith = expRpn2arith(expr);
+        println(exprArith2rpn(arith));
+        println(expArith2s(expRpn2arith(expr)));
+       
+    });
+    quit(0);
+}
