@@ -1,0 +1,137 @@
+import math/hash;
+import ds/hashmap;
+import ds/dlist;
+import ast;
+
+export{
+identity(from: Exp, to: Exp);
+
+makeIdentitiesTree(identities: [identity]) -> Tree<Exp, Exp>;
+findIdentities(expr: Exp, identitiesTree : Tree<Exp, Exp>) -> Exp;
+decomp(m : Maybe<?>, ifNone : ?) -> ?;
+maxIdentities(expr: Exp, identitiesTree : Tree<Exp, Exp>) -> Exp;
+
+}
+
+
+makeIdentitiesTree(identities: [identity]) -> Tree<Exp, Exp> {
+    fold(identities, makeTree(), \acc, ident -> {
+        setTree(acc, ident.from, ident.to)
+        });
+}
+
+decomp(m : Maybe<?>, ifNone : ?) -> ? {
+    switch(m) {
+        Some(v): v;
+        None(): ifNone;
+    }
+}
+
+maxIdentities(expr: Exp, identitiesTree : Tree<Exp, Exp>) -> Exp {
+    newExpr = findIdentities(expr, identitiesTree);
+    newnewExpr = findIdentities(newExpr, identitiesTree);
+    if (newExpr == expr || expr == newnewExpr) expr
+    else maxIdentities(newExpr, identitiesTree);
+}
+
+findIdentities(expr: Exp, identitiesTree : Tree<Exp, Exp>) -> Exp {
+    
+    result = switch(decomp(lookupTree(identitiesTree, expr), expr)) {
+        Add(lhs, rhs): Add(findIdentities(lhs, identitiesTree), findIdentities(rhs, identitiesTree));
+        Sub(lhs, rhs): Sub(findIdentities(lhs, identitiesTree), findIdentities(rhs, identitiesTree));
+        Mul(lhs, rhs): Mul(findIdentities(lhs, identitiesTree), findIdentities(rhs, identitiesTree));
+        Div(lhs, rhs): Div(findIdentities(lhs, identitiesTree), findIdentities(rhs, identitiesTree));
+        Neg(val): Neg(findIdentities(val, identitiesTree));
+        Int(n): decomp(lookupTree(identitiesTree, expr), Int(n));
+        Var(val): decomp(lookupTree(identitiesTree, expr), Var(val));
+    }
+    // println(exp2s(result));
+
+    foldTree(identitiesTree, result, \ident, value, acc -> {
+        isMatch = findTemplates(ident, acc, makeTree());
+        isMatch ?? resolveVars(value, isMatch) : acc;
+    });
+}
+
+resolveVars(expr : Exp, varResolve : Tree<Var, Exp>) -> Exp {
+    switch(expr) {
+        Add(lhs, rhs): Add(resolveVars(lhs, varResolve), resolveVars(rhs, varResolve));
+        Sub(lhs, rhs): Sub(resolveVars(lhs, varResolve), resolveVars(rhs, varResolve));
+        Div(lhs, rhs): Div(resolveVars(lhs, varResolve), resolveVars(rhs, varResolve));
+        Mul(lhs, rhs): Mul(resolveVars(lhs, varResolve), resolveVars(rhs, varResolve));
+        Int(n): expr;
+        Var(val): decomp(lookupTree(varResolve, expr), expr);
+        Neg(val): {
+            var = resolveVars(val, varResolve);
+            switch(var) {
+                Int(n): Neg(var);
+                Var(v): Neg(var);
+                default: Neg(Int(1.0));
+            }
+        }
+    }
+}
+
+findTemplates(templ : Exp, expr : Exp, identitiesTree : Tree<Var, Exp>) -> Maybe<Tree<Var, Exp>> {
+    switch(templ) {
+        Add(lhs, rhs): {
+            switch(expr) {
+                Add(l, r): {
+                    match = findTemplates(lhs, l, identitiesTree);     
+                    match ?? findTemplates(rhs, r, match) : None();      
+                } 
+                default: None();
+            }
+        }
+        Sub(lhs, rhs): {
+            switch(expr) {
+                Sub(l, r): {
+                    match = findTemplates(lhs, l, identitiesTree); 
+                    match ?? findTemplates(rhs, r, match) : None();  
+                }
+                default: None();
+            }
+        }
+        Mul(lhs, rhs): {
+            switch(expr) {
+                Mul(l, r): {
+                    match = findTemplates(lhs, l, identitiesTree); 
+                    match ?? findTemplates(rhs, r, match) : None(); 
+                }
+                default: None();
+            }
+        }
+        Div(lhs, rhs): {
+            switch(expr) {
+                Div(l, r): {
+                    match = findTemplates(lhs, l, identitiesTree);
+                    match ?? findTemplates(rhs, r, match) : None();  
+                }
+                default: None();
+            }
+        }
+        Int(n): {
+            switch(expr) {
+                Int(n1): {
+                    if (templ == expr) {
+                        Some(identitiesTree);
+                    }
+                    else {
+                        None();
+                    }
+                }
+                default: None();
+            }
+        }
+        Var(var): {
+            val = lookupTree(identitiesTree, templ);
+            val ?? if (val == expr) Some(identitiesTree) else None() : Some(setTree(identitiesTree, templ, expr));
+        }
+        Neg(val): {
+            switch(expr) {
+                Neg(val2): findTemplates(val, val2, identitiesTree);
+                default: None();
+            }
+        }
+  }
+}

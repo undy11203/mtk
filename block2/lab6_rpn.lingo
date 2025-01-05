@@ -1,9 +1,0 @@
-expr = (sum / mul / number)+
-
-mul = sp "*" sp
-sum = sp "+" sp
-
-number = digit+ sp
-
-digit = [0-9]
-sp = " "*

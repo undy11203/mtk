@@ -1,0 +1,22 @@
+import NemoCore;
+import VirtualMachine;
+
+main() {
+    nemoCodeTxt = getFileContent("samples/2.nemo");
+    println("Parsed nemo code:\n" + nemoCodeTxt + "\n\n");
+
+    switch (tryParseNemo(nemoCodeTxt)) {
+        Some(nemo): {
+            println("Nemo parsing finished");
+
+            nemoVm = nemo2nvm(nemo);
+            printvmProg(nemoVm);
+            ExecuteNemo(nemoVm);
+
+            println("finish");
+        };
+        None(): println("Failed to parse nemo code!");
+    }
+
+    quit(0);
+}

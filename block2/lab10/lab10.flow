@@ -1,0 +1,27 @@
+import rationalFn;
+import rules;
+
+main() {
+
+    idenitties = [
+        identity(s2lingo("x+y"), s2lingo("y+x")),
+        identity(s2lingo("a+a"), s2lingo("2*a")),
+        identity(s2lingo("x+(y+z)"), s2lingo("(x+y)+z"))
+    ];
+    
+    tests: [Pair<string, double>] = [
+        Pair("y+x+x+y", 0.0),
+        Pair("x+(y+x)", 0.0)
+    ];
+    
+    fori(0, length(tests) - 1, \i -> {
+        str: string = tests[i].first;
+        expr = s2lingo(str);
+        println(exp2s(expr));
+        println(exp2s(maxIdentities(expr, makeIdentitiesTree(idenitties))));
+
+        println("\n");
+
+    });
+    quit(0);
+}

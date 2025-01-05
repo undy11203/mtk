@@ -1,9 +1,9 @@
 expr = ws sum:e ws {:e};
 
 sum = mul:l ws "+" ws sum:r {Sum(:l, :r)} | mul:e {:e};
-mul = const:l ws "*" ws mul:r {Mul(:l, :r)} | const:e {:e};
+mul = int:l ws "*" ws mul:r {Mul(:l, :r)} | int:e {:e};
 
-const = digit+$d {Const(s2i($d))} | "(" expr:e ")" {:e};
+int = digit+$d {Int(s2i($d))} | "(" expr:e ")" {:e};
 
 digit = '0'-'9';
 ws = " "*;
